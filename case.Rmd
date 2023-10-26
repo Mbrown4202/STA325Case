@@ -1,0 +1,228 @@
+---
+title: "STA 325 Case Study"
+authors: "Avery Hodges, Jackson ___, Max Brown"
+date: "10/28/2023"
+output: pdf_document
+---
+
+```{r packages/data, message=FALSE}
+
+#loading packages 
+
+library(readr)
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(tidymodels)
+library(ISLR)
+library(gam)
+library(glmnet)
+
+#loading data
+
+data_train <- read_csv("data-train.csv")
+data_test <- read_csv("data-test.csv")
+
+```
+
+Exploratory Data Analysis - Prediction vs. Inference
+
+Notes:
+
+- Fr values reaching Inf = changed to a categorical variable, need to justify and explain how it affects the prediction and inference goals. 
+
+- Re and R_Moment_1 have a -0.77 correlation = look into
+
+- Responses: 
+1. All moments are a heavy right skew - transformed to log so not very interpretable but better for prediction
+2. R_moment_3 has very large values while R_moment_4 has very small values
+3. Don't seem to need any interaction terms
+
+```{r EDA}
+
+#looking at correlations/relationships between all variables
+
+pairs(data_train)
+
+#ridge regression not needed because predictors are not significantly correlated
+cor(data_train[, -7])
+
+str(data_train)
+
+#transforming training data Fr and Re values into categorical variables
+
+data_train$Fr[is.infinite(data_train$Fr)] <- 999999999
+
+data_train <- data_train |>
+  mutate(
+  R_moment_1 = log(R_moment_1),
+  R_moment_2 = log(R_moment_2),
+  R_moment_3 = log(R_moment_3),
+  R_moment_4 = log(R_moment_4),
+  St = log(St))
+
+data_test$Fr[is.infinite(data_test$Fr)] <- 999999999
+
+#transforming testing data Fr and Re values into categorical variables
+
+data_train |>
+  ggplot(aes(x = St, y = Fr)) +
+  geom_col()
+
+data_train |>
+  ggplot(aes(x = Re, y = Fr)) +
+  geom_col()
+
+```
+
+Model Selection
+
+- Need 4 models total, 1 for each R_Moment
+
+MLR:
+- Model 1: Adj R-Squared = 0.932 - is probably alright
+- Model 2: Adj R-Squared = 0.738, needs another method
+- Model 3: Adj R-Squared = 0.66, same as 2
+- Model 4: Adj R-Squared = 0.64, same as 2
+
+```{r linearregs}
+
+#R_moment_1 model
+lm_fit1 <- lm(R_moment_1 ~ St + Re + Fr, data = data_train)
+summary(lm_fit1)
+
+#R_moment_2 model
+lm_fit2 <- lm(R_moment_2 ~ St + Re + Fr, data = data_train)
+summary(lm_fit2)
+
+#R_moment_3 model
+lm_fit3 <- lm(R_moment_3 ~ St + Re + Fr, data = data_train)
+summary(lm_fit3)
+
+#R_moment_4 model
+lm_fit4 <- lm(R_moment_4 ~ St + Re + Fr, data = data_train)
+summary(lm_fit4)
+
+```
+ - using backwards selection to find best model 
+ Started with all interaction terms then removed interaction with St*Fr
+ Best so far is 0.9472
+ 
+```{r model 1}
+
+#R_moment_1 model
+lm_fit5 <- lm(R_moment_1 ~ St + Re + Fr + St*Re + Re*Fr, data = data_train)
+summary(lm_fit5)
+
+#Predicting with Linear
+predict_1 <- predict(lm_fit5, newdata = data_test)
+
+```
+
+```{r model 2}
+
+
+
+```
+
+Model 3
+- Original Model: 512.5497
+-Polynomial: AIC of 505.66, Adj R-Squared 0.5169, St = 3 and Re = 2
+- GAM: AIC of 448.0414, 2poly and ns(Fr)
+
+```{r model 3 poly}
+
+fit7 <- lm(R_moment_3 ~ poly(St,3) + poly(Re,2) + Fr,data=data_train)
+summary(fit7)
+
+AIC(fit7)
+
+```
+```{r model 3 GAM}
+
+#Linear model
+mod_lm = gam(R_moment_3~ St + Re + Fr, data = data_train)
+summary(mod_lm)
+
+#Second try with splines
+mod_gam1 = gam(R_moment_3 ~ poly(St,2) + poly(Re,2) + ns(Fr, df = 4), data = data_train)
+summary(mod_gam1)
+
+#Predict with GAM
+predict_3 <- predict(mod_gam1, newdata = data_test)
+
+```
+
+### Model 4 
+
+#### EDA
+
+```{r}
+attach(data_train)
+plot(St, R_moment_4)
+plot(Re, R_moment_4)
+plot(Fr, R_moment_4)
+```
+
+
+#### linear backwards selection 
+
+```{r}
+lm_fit4 <- lm(R_moment_4 ~ St + Re + Fr + St*Re + St*Fr + Re*Fr , data = data_train)
+#summary(lm_fit4)
+
+# With BIC
+modBIC <- MASS::stepAIC(lm_fit4, k = log(nrow(data_train)))
+```
+Backwards BIC suggests the inclusion of all main effects and Re*Fr interaction
+
+
+
+```{r model 4}
+
+
+Stfit.1 <- lm(R_moment_4 ~ St + Re + Fr + Re*Fr,data=data_train)
+Stfit.2 <- lm(R_moment_4 ~ poly(St,2) + Re + Fr + Re*Fr,data=data_train)
+Stfit.3 <- lm(R_moment_4 ~ poly(St,3) + Re + Fr + Re*Fr,data=data_train)
+Stfit.4 <- lm(R_moment_4 ~ poly(St,4) + Re + Fr + Re*Fr,data=data_train)
+Stfit.5 <- lm(R_moment_4 ~ poly(St,5) + Re + Fr + Re*Fr,data=data_train)
+anova(Stfit.1,Stfit.2,Stfit.3,Stfit.4,Stfit.5)
+
+AIC(Stfit.5)
+
+```
+
+Keeping St to the 1st power makes the most sense
+
+
+
+```{r}
+Refit.1 <- lm(R_moment_4 ~ St + Re + Fr + Re*Fr,data=data_train)
+Refit.2 <- lm(R_moment_4 ~ St + poly(Re, 2) + Fr + Re*Fr,data=data_train)
+
+
+anova(Refit.1,Refit.2)
+```
+Will keep Re to the 2nd power
+
+```{r}
+Frfit.21 <- lm(R_moment_4 ~ St + poly(Re, 2) + Fr + Re*Fr,data=data_train)
+Frfit.22 <- lm(R_moment_4 ~ St + poly(Re, 2) + poly(Fr, 2) + Re*Fr,data=data_train)
+
+anova(Frfit.21,Frfit.22)
+
+Refrfit1 <- lm(R_moment_4 ~ St + poly(Re, 2) + Fr + Re*Fr,data=data_train)
+Refrfit2 <- lm(R_moment_4 ~ St + poly(Re, 2) + Fr + poly(Re*Fr, 2),data=data_train)
+
+anova(Refrfit1, Refrfit2)
+```
+Keep Fr to 1st power
+
+
+```{r}
+final_4_model <- lm(R_moment_4 ~ St + poly(Re, 2) + Fr + poly(Re, 2)*Fr, data=data_train)
+
+AIC(final_4_model)
+
+```
+
