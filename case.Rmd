@@ -59,8 +59,7 @@ data_train <- data_train |>
   R_moment_1 = log(R_moment_1),
   R_moment_2 = log(R_moment_2),
   R_moment_3 = log(R_moment_3),
-  R_moment_4 = log(R_moment_4),
-  St = log(St))
+  R_moment_4 = log(R_moment_4))
 
 data_test$Fr[is.infinite(data_test$Fr)] <- 999999999
 
@@ -186,13 +185,11 @@ lm_fit4 <- lm(R_moment_4 ~ St + Re + Fr + St*Re + St*Fr + Re*Fr , data = data_tr
 # With BIC
 modBIC <- MASS::stepAIC(lm_fit4, k = log(nrow(data_train)))
 ```
-Backwards BIC suggests the inclusion of all main effects and Re*Fr interaction
+Backwards BIC suggests the inclusion of Re*Fr interaction
 
 potentially try lasso
 
 ```{r model 4}
-
-
 Stfit.1 <- lm(R_moment_4 ~ St + Re + Fr + Re*Fr,data=data_train)
 Stfit.2 <- lm(R_moment_4 ~ poly(St,2) + Re + Fr + Re*Fr,data=data_train)
 Stfit.3 <- lm(R_moment_4 ~ poly(St,3) + Re + Fr + Re*Fr,data=data_train)
@@ -235,10 +232,10 @@ Keep Fr to 1st power
 final_4_model <- lm(R_moment_4 ~ St + poly(Re, 2) + Fr + poly(Re, 2)*Fr, data=data_train)
 
 AIC(final_4_model)
-kable(tidy(final_4_model), digits = 7)
+kable(tidy(final_4_model), digits = 10)
 ```
 
-$$\hat{log(kurtosis)} = 8.265 + 1.551* St -50.92*Re + 14.943*Re^2 - 4.717*10^{-9} * Fr + 3.889*10^8*Fr*Re - 1.023*10^8*Fr*Re^2$$
+$$\hat{log(kurtosis)} = 6.207 + 1.328* St -50.41*Re + 15.36*Re^2 - 4.8*10^{-9} * Fr + 3.93*10^{-8}*Fr*Re - 1.19*10^{-8}*Fr*Re^2$$
 
 ### Checking Lasso 
 
@@ -270,6 +267,18 @@ Thought about creating a lasso model but believed the interpretation
 
 
 
+```{r}
+data_train |>
+  ggplot(aes(x = Re, y = R_moment_4)) +
+  geom_point() + labs(x = "Fluid Turbulence (Re)", y = "Log-Transformed Kurtosis of Distribution (R_moment_4)", title = "Non-Linear Relationship between Fluid Turbulence and Kurtosis of Distribution" )
+```
 
+```{r}
+#lasso_data_test <-data_test %>% mutate(ReFr = Re*Fr, ReSt = Re*St, FrSt = Fr*St) 
+#lasso_data_test <- as.matrix(lasso_data_test)
+
+data_test <- data_test %>% mutate(predicted_moment4 = predict(final_4_model, newdata = data_test))
+data_test
+```
 
 
