@@ -232,7 +232,7 @@ Keep Fr to 1st power
 final_4_model <- lm(R_moment_4 ~ St + poly(Re, 2) + Fr + poly(Re, 2)*Fr, data=data_train)
 
 AIC(final_4_model)
-kable(tidy(final_4_model), digits = 10)
+tidy(final_4_model)
 ```
 
 $$\hat{log(kurtosis)} = 6.207 + 1.328* St -50.41*Re + 15.36*Re^2 - 4.8*10^{-9} * Fr + 3.93*10^{-8}*Fr*Re - 1.19*10^{-8}*Fr*Re^2$$
